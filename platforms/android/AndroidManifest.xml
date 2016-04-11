@@ -4,5 +4,7 @@
   <!-- you can remove these if you don't want to show the user's location on a Mapbox map -->
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-
+  <application>
+      <service android:name="com.mapbox.mapboxsdk.telemetry.TelemetryService" />
+  </application>
 </manifest>

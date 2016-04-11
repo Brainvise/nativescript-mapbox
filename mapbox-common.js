@@ -1,3 +1,5 @@
+var observableModule = require("data/observable");
+
 var mapbox = {};
 
 mapbox.MapStyle = {
