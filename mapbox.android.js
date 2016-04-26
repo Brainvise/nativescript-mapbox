@@ -103,6 +103,7 @@ mapbox.show = function (arg) {
                         if (mapbox._fineLocationPermissionGranted()) {
 
                             // mapView.setMyLocationEnabled(true);
+                            //load offline maps
                         } else {
                             // devs should ask permission upfront, otherwise enabling location will crash the app on Android 6
                             console.log("Mapbox plugin: not showing the user location on this device because persmission was not requested/granted");

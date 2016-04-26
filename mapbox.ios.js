@@ -1,6 +1,8 @@
 // TODO add callback handler for clicked marker callouts
 var mapbox = require("./mapbox-common");
 var app = require("application");
+var connectivity = require("connectivity");
+var dialogs = require("ui/dialogs");
 
 mapbox._getMapStyle = function (input) {
     if (input === mapbox.MapStyle.LIGHT) {
@@ -89,17 +91,8 @@ mapbox.show = function (arg, offlineProgress, offlineError) {
                 }
             }
 
-            // Assign first to local variable, otherwise it will be garbage collected since delegate is weak reference.
-            var delegate = MGLMapViewDelegateImpl.new().initWithCallback(function (loaded) {
-                //delegate = undefined;
-            });
-            mapView.delegate = delegate;
+            function loadOfflineContent() {
 
-            // wrapping in a little timeout since the map area tends to flash black a bit initially
-            setTimeout(function () {
-                view.addSubview(mapView);
-
-                //download any offline content specified
                 // Create a region that includes the current viewport and any tiles needed to view it when zoomed further in.
                 // var region = MGLTilePyramidOfflineRegion.initWithStyleURLBoundsFromZoomLevelToZoomLevel(mapView.styleURL, mapView.visibleCoordinateBounds, mapView.zoomLevel, mapView.maximumZoomLevel)
                 var region = new MGLTilePyramidOfflineRegion(mapView.styleURL, mapView.visibleCoordinateBounds, mapView.zoomLevel, settings.maxOfflineZoom);
@@ -123,22 +116,62 @@ mapbox.show = function (arg, offlineProgress, offlineError) {
                     var pack = notification.object;
                     var userInfo = NSKeyedUnarchiver.unarchiveObjectWithData(pack.content);
                     var progress = pack.progress;
-                    console.log(notification);
+                    // console.log(notification);
                     // console.log(pack);
                     var percent = progress.countOfResourcesCompleted / progress.countOfResourcesExpected;
                     offlineProgress(percent);
-                    console.log('offline pack downloading downloading: ' + progress.countOfResourcesCompleted + ' of ' + progress.countOfResourcesExpected);
+                    // console.log('offline pack downloading downloading: ' + progress.countOfResourcesCompleted + ' of ' + progress.countOfResourcesExpected);
                 });
 
                 app.ios.addNotificationObserver(MGLOfflinePackErrorNotification, function onReceiveCallback(notification) {
                     console.log('error downloading offline pack: ');
                     console.log(notification);
+                    offlineProgress(null, 'Error downloading map. Please check your internet connection.');
                 });
 
                 app.ios.addNotificationObserver(MGLOfflinePackMaximumMapboxTilesReachedNotification, function onReceiveCallback(notification) {
                     console.log('maximum allowed mapbox tiles');
                     console.log(notification);
+                    offlineProgress(1);
                 });
+            }
+
+            // Assign first to local variable, otherwise it will be garbage collected since delegate is weak reference.
+            var delegate = MGLMapViewDelegateImpl.new().initWithCallback(function (loaded) {
+                //delegate = undefined;
+                //animate map to position
+                //set camera position
+                mapbox.animateCamera(settings.camera);
+
+
+
+                //download any offline content specified
+                if(!settings.downloadOfflineContent || !loaded) {
+                    return;
+                }
+
+                var connectionType = connectivity.getConnectionType();
+                switch (connectionType) {
+                    case connectivity.connectionType.none:
+                        break;
+                    case connectivity.connectionType.wifi:
+                        loadOfflineContent();
+                        break;
+                    case connectivity.connectionType.mobile:
+                        dialogs.confirm("Would you like to download an offline version of this map now?").then(function (result) {
+                            loadOfflineContent();
+                        });
+                        break;
+                }
+
+            });
+
+
+            mapView.delegate = delegate;
+
+            // wrapping in a little timeout since the map area tends to flash black a bit initially
+            setTimeout(function () {
+                view.addSubview(mapView);
 
             }, 500);
 
@@ -269,6 +302,7 @@ mapbox.getTilt = function () {
 };
 
 mapbox.animateCamera = function (arg) {
+    console.log('cam args: ', arg);
     return new Promise(function (resolve, reject) {
         try {
 
@@ -283,6 +317,7 @@ mapbox.animateCamera = function (arg) {
             cam.centerCoordinate = CLLocationCoordinate2DMake(target.lat, target.lng);
 
             if (arg.altitude) {
+                console.log('setting altitude: ', arg.altitude);
                 cam.altitude = arg.altitude;
             }
 
@@ -293,6 +328,7 @@ mapbox.animateCamera = function (arg) {
             if (arg.tilt) {
                 cam.pitch = arg.tilt;
             }
+            console.log('cam: ', cam);
 
             var duration = arg.duration || 15; // default
 
@@ -356,6 +392,7 @@ var MGLMapViewDelegateImpl = (function (_super) {
         return this;
     };
     MGLMapViewDelegateImpl.prototype.mapViewDidFinishLoadingMap = function (mapView) {
+        console.log('did finish loading map proto');
         this._callback(true);
     };
     MGLMapViewDelegateImpl.prototype.mapViewAnnotationCanShowCallout = function (mapView, annotation) {

@@ -27,7 +27,10 @@ mapbox.defaults = {
   disableRotation: false,
   disableScroll: false,
   disableZoom: false,
-  disableTilt: false
+  disableTilt: false,
+  camera: {},
+  downloadOfflineContent: false,
+  maxOfflineZoom: 12
 };
 
 mapbox.merge = function merge(obj1, obj2){ // Our merge function
