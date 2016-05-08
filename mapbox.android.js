@@ -4,6 +4,8 @@ var application = require("application");
 var frame = require("ui/frame");
 var mapbox = require("./mapbox-common");
 var ACCESS_FINE_LOCATION_PERMISSION_REQUEST_CODE = 111;
+//instance of map
+var mapView;
 
 mapbox._fineLocationPermissionGranted = function () {
     var hasPermission = android.os.Build.VERSION.SDK_INT < 23; // Android M. (6.0)
@@ -104,6 +106,90 @@ mapbox.show = function (arg) {
 
                             // mapView.setMyLocationEnabled(true);
                             //load offline maps
+                            var context = application.android.context;
+                            var resources = context.getResources();
+                            var offlineManager = OfflineManager.getInstance(context);
+                            offlineManager.setAccessToken(resources.accessToken);
+                            //get bounds
+                            var projection = mapView.getProjection();
+                            var topLeft = projection.fromScreenLocation(new android.graphics.PointF(0, 0));
+                            var topRight = projection.fromScreenLocation(new android.graphics.PointF(viewWidth, 0));
+                            var bottomRight = projection.fromScreenLocation(new android.graphics.PointF(viewWidth, viewHeight));
+                            var bottomLeft = projection.fromScreenLocation(new android.graphics.PointF(0, viewHeight));
+                            var latLngBounds = new LatLngBounds.Builder()
+                                .include(topRight) // Northeast
+                                .include(bottomLeft) // Southwest
+                                .build();
+                            var definition = new com.mapbox.mapboxsdk.maps.OfflineTilePyramidRegionDefinition(
+                                mapView.getStyleUrl(),
+                                latLngBounds,
+                                10,
+                                20,
+                                context.getResources().getDisplayMetrics().density);
+
+                                // Set the metadata
+                            var metadata;
+                            try {
+                               var jsonObject = {};
+                               jsonObject.put("offline_map", "Yosemite National Park");
+                               var json = JSON.stringify(jsonObject);
+                               metadata = Array.create('byte', json);
+                            } catch (e) {
+                            //    console.log("Failed to encode metadata: " + e.getMessage());
+                                console.log('error setting metadata');
+                                console.log(e);
+                               metadata = null;
+                            }
+
+                            offlineManager.createOfflineRegion(definition, metadata, new com.mapbox.mapboxsdk.offline.OfflineManager.CreateOfflineRegionCallback({
+                                onCreate: function(offlineRegion) {
+                                    offlineRegion.setDownloadState(com.mapbox.mapboxsdk.offline.OfflineRegion.STATE_ACTIVE);
+
+
+                                    // Monitor the download progress using setObserver
+                                    offlineRegion.setObserver(new com.mapbox.mapboxsdk.offline.OfflineRegion.OfflineRegionObserver({
+                                        onStatusChanged: function(status) {
+
+                                            // Calculate the download percentage and update the progress bar
+                                            var percentage = status.getRequiredResourceCount() >= 0 ?
+                                                    (100.0 * status.getCompletedResourceCount() / status.getRequiredResourceCount()) :
+                                                    0.0;
+
+                                            if (status.isComplete()) {
+                                                // Download complete
+                                                endProgress("Region downloaded successfully.");
+                                            } else if (status.isRequiredResourceCountPrecise()) {
+                                                // Switch to determinate state
+                                                setPercentage(Math.round(percentage));
+                                            }
+                                        },
+
+                                        onError: function(error) {
+                                            // If an error occurs, print to logcat
+                                            console.log("onError reason: " + error.getReason());
+                                            console.log("onError message: " + error.getMessage());
+                                        },
+
+                                         mapboxTileCountLimitExceeded: function(limit) {
+                                            // Notify if offline region exceeds maximum tile count
+                                            console.log("Mapbox tile count limit exceeded: " + limit);
+                                        }
+                                    }));
+                                },
+                                onError: function(error) {
+                                    console.log("Error: " + error);
+                                }
+                            }));
+
+                            function setPercentage(percent) {
+                                console.log('percent downloaded: '+ percent);
+                            }
+
+                            function endProgress() {
+                                console.log('finished downloading map');
+                            }
+
+
                         } else {
                             // devs should ask permission upfront, otherwise enabling location will crash the app on Android 6
                             console.log("Mapbox plugin: not showing the user location on this device because persmission was not requested/granted");
