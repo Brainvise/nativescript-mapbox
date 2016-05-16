@@ -103,13 +103,11 @@ mapbox.show = function (arg) {
                     //get user location
                     if (settings.showUserLocation) {
                         if (mapbox._fineLocationPermissionGranted()) {
-
+                            console.log('fine location granted');
                             // mapView.setMyLocationEnabled(true);
                             //load offline maps
                             var context = application.android.context;
                             var resources = context.getResources();
-                            var offlineManager = OfflineManager.getInstance(context);
-                            offlineManager.setAccessToken(resources.accessToken);
                             //get bounds
                             var projection = mapView.getProjection();
                             var topLeft = projection.fromScreenLocation(new android.graphics.PointF(0, 0));
@@ -131,18 +129,22 @@ mapbox.show = function (arg) {
                             var metadata;
                             try {
                                var jsonObject = {};
-                               jsonObject.put("offline_map", "Yosemite National Park");
+                               jsonObject.put("offline_map", "Provo Map");
                                var json = JSON.stringify(jsonObject);
                                metadata = Array.create('byte', json);
+                               console.log('setting up metadata');
                             } catch (e) {
                             //    console.log("Failed to encode metadata: " + e.getMessage());
                                 console.log('error setting metadata');
                                 console.log(e);
                                metadata = null;
                             }
-
+                            console.log('creating offline manager')
+                            var offlineManager = OfflineManager.getInstance(context);
+                            offlineManager.setAccessToken(resources.accessToken);
                             offlineManager.createOfflineRegion(definition, metadata, new com.mapbox.mapboxsdk.offline.OfflineManager.CreateOfflineRegionCallback({
                                 onCreate: function(offlineRegion) {
+                                    console.log('creating offline region');
                                     offlineRegion.setDownloadState(com.mapbox.mapboxsdk.offline.OfflineRegion.STATE_ACTIVE);
 
 
