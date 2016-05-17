@@ -103,55 +103,58 @@ mapbox.show = function (arg) {
                     //get user location
                     if (settings.showUserLocation) {
                         if (mapbox._fineLocationPermissionGranted()) {
-                            console.log('fine location granted');
                             // mapView.setMyLocationEnabled(true);
                             //load offline maps
                             var context = application.android.context;
                             var resources = context.getResources();
                             //get bounds
-                            var projection = mapView.getProjection();
-                            var topLeft = projection.fromScreenLocation(new android.graphics.PointF(0, 0));
-                            var topRight = projection.fromScreenLocation(new android.graphics.PointF(viewWidth, 0));
-                            var bottomRight = projection.fromScreenLocation(new android.graphics.PointF(viewWidth, viewHeight));
-                            var bottomLeft = projection.fromScreenLocation(new android.graphics.PointF(0, viewHeight));
-                            var latLngBounds = new LatLngBounds.Builder()
-                                .include(topRight) // Northeast
-                                .include(bottomLeft) // Southwest
-                                .build();
-                            var definition = new com.mapbox.mapboxsdk.maps.OfflineTilePyramidRegionDefinition(
-                                mapView.getStyleUrl(),
-                                latLngBounds,
-                                10,
-                                20,
-                                context.getResources().getDisplayMetrics().density);
-
+                            var projection = mapboxMap.getProjection();
+                            // var latLngBounds = new com.mapbox.mapboxsdk.geometry.LatLngBounds.Builder()
+                            //     .include(topRight) // Northeast
+                            //     .include(bottomLeft) // Southwest
+                            //     .build();
+                            console.log('style: '+mapboxMap.getStyleUrl());
+                            console.log('bounds: '+projection.getVisibleRegion().latLngBounds);
+                            console.log('zoom: '+mapboxMap.getCameraPosition().zoom);
+                            console.log('max zoom: '+settings.maxOfflineZoom);
+                            console.log('density: '+resources.getDisplayMetrics().density);
+                            var definition = new com.mapbox.mapboxsdk.offline.OfflineTilePyramidRegionDefinition(
+                                mapboxMap.getStyleUrl(),
+                                projection.getVisibleRegion().latLngBounds,
+                                mapboxMap.getCameraPosition().zoom,
+                                settings.maxOfflineZoom,
+                                resources.getDisplayMetrics().density);
+                            console.log('offline definition defined');
                                 // Set the metadata
                             var metadata;
                             try {
-                               var jsonObject = {};
-                               jsonObject.put("offline_map", "Provo Map");
+                                var jsonObject = {
+                                   "offline_map": "Middle Provo Map"
+                                };
                                var json = JSON.stringify(jsonObject);
-                               metadata = Array.create('byte', json);
-                               console.log('setting up metadata');
+                               metadata = [];
+                               for (var i = 0; i < json.length; i++) {
+                                   metadata.push(json.charCodeAt(i));
+                               }
                             } catch (e) {
                             //    console.log("Failed to encode metadata: " + e.getMessage());
                                 console.log('error setting metadata');
                                 console.log(e);
                                metadata = null;
                             }
-                            console.log('creating offline manager')
-                            var offlineManager = OfflineManager.getInstance(context);
-                            offlineManager.setAccessToken(resources.accessToken);
+                            var offlineManager = com.mapbox.mapboxsdk.offline.OfflineManager.getInstance(context);
+                            offlineManager.setAccessToken(settings.accessToken);
+                            console.log('offline manager access token set');
                             offlineManager.createOfflineRegion(definition, metadata, new com.mapbox.mapboxsdk.offline.OfflineManager.CreateOfflineRegionCallback({
                                 onCreate: function(offlineRegion) {
                                     console.log('creating offline region');
                                     offlineRegion.setDownloadState(com.mapbox.mapboxsdk.offline.OfflineRegion.STATE_ACTIVE);
-
+                                    console.log('setting active state');
 
                                     // Monitor the download progress using setObserver
                                     offlineRegion.setObserver(new com.mapbox.mapboxsdk.offline.OfflineRegion.OfflineRegionObserver({
                                         onStatusChanged: function(status) {
-
+                                            console.log('downloading region');
                                             // Calculate the download percentage and update the progress bar
                                             var percentage = status.getRequiredResourceCount() >= 0 ?
                                                     (100.0 * status.getCompletedResourceCount() / status.getRequiredResourceCount()) :
@@ -170,16 +173,15 @@ mapbox.show = function (arg) {
                                             // If an error occurs, print to logcat
                                             console.log("onError reason: " + error.getReason());
                                             console.log("onError message: " + error.getMessage());
-                                        },
-
-                                         mapboxTileCountLimitExceeded: function(limit) {
-                                            // Notify if offline region exceeds maximum tile count
-                                            console.log("Mapbox tile count limit exceeded: " + limit);
                                         }
                                     }));
                                 },
                                 onError: function(error) {
                                     console.log("Error: " + error);
+                                },
+                                mapboxTileCountLimitExceeded: function(limit) {
+                                    // Notify if offline region exceeds maximum tile count
+                                    console.log("Mapbox tile count limit exceeded: " + limit);
                                 }
                             }));
 
