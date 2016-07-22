@@ -1,6 +1,6 @@
 # NativeScript Mapbox
 
-Awesome native OpenGL-owered maps - by Mapbox
+Awesome native OpenGL-powered maps - by Mapbox
 
 <img src="screenshots/ios-demoapp-slice.png" width="375px" height="196px" />
 
@@ -10,11 +10,10 @@ Awesome native OpenGL-owered maps - by Mapbox
 * you care about performance so you don't want a web based solution,
 * you want an open source map implementation that you can tweak yourself,
 * you want to leverage Mapbox's backend to visualize massive geo data sets,
-* you want advanced analytics about your app's users.
+* you want advanced analytics about your app's users,
+* __NEW__ You need offline maps and custom markers.
 
 ## Prerequisites
-NativeScript 1.3.0 (`tns --version`) is required for smooth installation, so please upgrade if you need to.
-
 You need a Mapbox API access token (they have a free Starter plan!), so [sign up with Mapbox](https://www.mapbox.com/signup/).
 Once you've registered go to your Account > Apps > New token. The 'Default Secret Token' is what you'll need.
 
@@ -27,7 +26,13 @@ tns plugin add nativescript-mapbox
 If you get an error during iOS build related to Podspec versions, probably the easiest fix is:
 `tns platform remove ios` and `tns platform add ios`.
 
-## Usage
+On Android make sure you add this to the `<application>` node of `app/App_Resources/Android/AndroidManifest.xml` (the plugin already attempts to do so):
+
+```xml
+  <service android:name="com.mapbox.mapboxsdk.telemetry.TelemetryService" />
+```
+
+## Basic usage
 
 If you want a quickstart, [clone our demo app](https://github.com/EddyVerbruggen/nativescript-mapbox-demo).
 And here's the comprehensive list of supported functions:
@@ -35,15 +40,17 @@ And here's the comprehensive list of supported functions:
 ### show
 ```js
   var mapbox = require("nativescript-mapbox");
+  var platform = require("platform");
+  var isIOS = platform.device.os === platform.platformNames.ios;
 
   mapbox.show({
     accessToken: 'YOUR_API_ACCESS_TOKEN', // see 'Prerequisites' above
-    style: 'emerald', // light|dark|emerald|satellite|streets , default 'streets' (there is also 'hybrid' for Android)
+    style: mapbox.MapStyle.DARK, // see the mapbox.MapStyle enum for other options, default mapbox.MapStyle.STREETS
     margins: {
       left: 40, // default 0
       right: 40, // default 0
       top: 450, // default 0
-      bottom: 40 // default 0
+      bottom: isIOS ? 50: 0 // default 0, this shows how to override the style for iOS
     },
     center: { // optional without a default
       lat: 52.3702160,
@@ -59,10 +66,13 @@ And here's the comprehensive list of supported functions:
     disableZoom: false, // default false
     markers: [ // optional without a default
       {
-        'lat': 52.3732160, // mandatory
-        'lng': 4.8941680, // mandatory
-        'title': 'Nice location', // recommended to pass in
-        'subtitle': 'Really really nice location' // one line is available on iOS, multiple on Android
+        lat: 52.3732160, // mandatory
+        lng: 4.8941680, // mandatory
+        title: 'Nice location', // recommended to pass in
+        subtitle: 'Really really nice location', // one line is available on iOS, multiple on Android
+        iconPath: 'res/markers/green_pin_marker.png', // anywhere in your app folder
+        onTap: function(marker) { console.log("This marker was tapped"); },
+        onCalloutTap: function(marker) { console.log("The callout of this marker was tapped"); }
       }
     ]
   }).then(
@@ -84,12 +94,22 @@ Also, all functions support promises, but we're leaving out the `.then()` stuff 
 
 ### addMarkers
 ```js
+  var onTap = function(marker) {
+    console.log("Marker tapped with title: '" + marker.title + "'");
+  };
+  var onCalloutTap = function(marker) {
+    alert("Marker callout tapped with title: '" + marker.title + "'");
+  };
+
   mapbox.addMarkers([
     {
-      'lat': 52.3602160, // mandatory
-      'lng': 4.8891680, // mandatory
-      'title': 'One-line title here', // no popup unless set
-      'subtitle': 'Infamous subtitle!'
+      lat: 52.3602160, // mandatory
+      lng: 4.8891680, // mandatory
+      title: 'One-line title here', // no popup unless set
+      subtitle: 'Infamous subtitle!',
+      iconPath: 'res/markers/home_marker.png',
+      onTap: onTap,
+      onCalloutTap: onCalloutTap
     },
     {
       ..
@@ -108,7 +128,7 @@ Also, all functions support promises, but we're leaving out the `.then()` stuff 
   )
 ```
 
-### function: getCenter
+### getCenter
 Here the promise callback makes sense, so adding it to the example:
 ```js
   mapbox.getCenter().then(
@@ -157,7 +177,7 @@ Here the promise callback makes sense, so adding it to the example:
     altitude: 2000, // iOS (meters from the ground)
     bearing: 270, // Where the camera is pointing, 0-360 (degrees)
     tilt: 50,
-    duration: 10 // in seconds
+    duration: 10000 // in milliseconds
   })
 ```
 
@@ -165,7 +185,7 @@ Here the promise callback makes sense, so adding it to the example:
 ```js
   mapbox.setTilt(
       {
-        pitch: 35, // default 30 (degrees angle)
+        tilt: 40, // default 30 (degrees angle)
         duration: 4000 // default 5000 (milliseconds)
       }
   )
@@ -201,6 +221,126 @@ Draw a shape (like a line/route, or star). Just connect the dots like we did as 
     ]
   })
 ```
+
+### addPolyline (Android)
+Draw a polyline. Connect the points given as parameters.
+```js
+  // Draw a two segment line near Amsterdam Central Station
+  mapbox.addPolyline({
+      color: 0xff29a025, //Set the color of the line (default black)
+      width: 7, //Set the width of the line (default 5)
+      points: [
+          {
+              'lat': 52.3833160, // mandatory
+              'lng': 4.8991780 // mandatory
+          },
+          {
+              'lat': 52.3834160,
+              'lng': 4.8991880
+          },
+          {
+              'lat': 52.3835160,
+              'lng': 4.8991980
+          }
+      ]
+  });
+```
+
+## Offline maps
+For situation where you want the user to pre-load certain regions you can use these methods to create and remove offline regions.
+
+__Important read:__ [the offline maps documentation by Mapbox](https://www.mapbox.com/help/mobile-offline/).
+
+### downloadOfflineRegion
+This example downloads the region 'Amsterdam' on zoom levels 9, 10 and 11 for map style 'outdoors'.
+
+```js
+  mapbox.downloadOfflineRegion(
+    {      
+      accessToken: accessToken, // required for Android in case no map has been shown yet
+      name: "Amsterdam", // this name can be used to delete the region later
+      style: mapbox.MapStyle.OUTDOORS,
+      minZoom: 9,
+      maxZoom: 11,
+      bounds: {
+        north: 52.4820,
+        east: 5.1087,
+        south: 52.2581,
+        west: 4.6816
+      },
+      // this function is called many times during a download, so
+      // use it to show an awesome progress bar!
+      onProgress: function (progress) {
+        console.log("Download progress: " + JSON.stringify(progress));
+      }
+    }
+  ).then(
+    function() {
+      console.log("Offline region downloaded");
+    },
+    function(error) {
+      console.log("Download error: " + error);
+    }
+  );
+```
+
+#### Advanced example: download the current viewport
+Grab the viewport with the `mapbox.getViewport()` function and download it at various zoom levels:
+
+```js
+  // I spare you the error handling on this one..
+  mapbox.getViewport().then(function(viewport) {
+    mapbox.downloadOfflineRegion(
+      {
+        name: "LastViewport", // anything you like really
+        style: mapbox.MapStyle.OUTDOORS,
+        minZoom: viewport.zoomLevel,
+        maxZoom: viewport.zoomLevel + 2, // higher zoom level is lower to the ground
+        bounds: viewport.bounds,
+        onProgress: function (progress) {
+          console.log("Download %: " + progress.percentage);
+        }
+      }
+    );
+  });
+```
+
+### listOfflineRegions
+To help you manage offline regions there's a `listOfflineRegions` function you can use. You can then fi. call `deleteOfflineRegion` (see below) and pass in the `name` to remove any cached region(s) you like.
+
+```js
+  mapbox.listOfflineRegions({
+    // required for Android in case no map has been shown yet
+    accessToken: accessToken,
+  }).then(
+    function(regions) {
+      console.log(JSON.stringify(JSON.stringify(regions));
+    },
+    function(error) {
+      console.log("Error while listing offline regions: " + error);
+    }
+  );
+
+```
+
+### deleteOfflineRegion
+You can remove regions you've previously downloaded. Any region(s) matching the `name` param will be removed locally.
+
+```js
+  mapbox.deleteOfflineRegion({
+    name: "Amsterdam"
+  }).then(
+    function() {
+      console.log("Offline region deleted");
+    },
+    function(error) {
+      console.log("Error while deleting an offline region: " + error);
+    }
+  );
+```
+
+
+## Permissions
 
 ### hasFineLocationPermission / requestFineLocationPermission
 On Android 6 you need to request permission to be able to show the user's position on the map at runtime when targeting API level 23+.

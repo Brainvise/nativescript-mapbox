@@ -1,5 +1,3 @@
-var observableModule = require("data/observable");
-
 var mapbox = {};
 
 mapbox.MapStyle = {
@@ -27,10 +25,7 @@ mapbox.defaults = {
   disableRotation: false,
   disableScroll: false,
   disableZoom: false,
-  disableTilt: false,
-  camera: {},
-  downloadOfflineContent: false,
-  maxOfflineZoom: 12
+  disableTilt: false
 };
 
 mapbox.merge = function merge(obj1, obj2){ // Our merge function
@@ -64,5 +59,6 @@ mapbox.hasFineLocationPermission = function () {
 };
 
 mapbox.mapView = null;
+mapbox.mapboxMap = null;
 
 module.exports = mapbox;
