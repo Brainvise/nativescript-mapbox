@@ -25,14 +25,31 @@ mapbox.hasFineLocationPermission = function () {
 mapbox.requestFineLocationPermission = function () {
   return new Promise(function (resolve) {
     if (!mapbox._fineLocationPermissionGranted()) {
-      // in a future version we could hook up the callback and change this flow a bit
-      android.support.v4.app.ActivityCompat.requestPermissions(
-          application.android.foregroundActivity,
-          [android.Manifest.permission.ACCESS_FINE_LOCATION],
-          ACCESS_FINE_LOCATION_PERMISSION_REQUEST_CODE);
-      // this is not the nicest solution as the user needs to initiate scanning again after granting permission,
-      // so enhance this in a future version, but it's ok for now
-      resolve();
+        // in a future version we could hook up the callback and change this flow a bit
+
+        // android.support.v4.app.ActivityCompat.OnRequestPermissionsResultCallback.extend({
+        //     onRequestPermissionsResult: function (requestCode, permissions, grantResults) {
+        //         console.log('request permissions granted: '+ requestCode+ " : " + permissions + " : " + grantResults);
+        //         resolve();
+        //     }
+        // });
+
+
+        application.android.on(application.AndroidApplication.activityRequestPermissionsEvent, function(args) {
+            console.log('permissions granted: ' + JSON.stringify(args.requestCode) + " : " + JSON.stringify(args.permissions) + " : " + JSON.stringify(args.grantResults));
+            // permissions granted: 111 : {"length":1} : {"length":1}
+            resolve();
+        });
+
+        android.support.v4.app.ActivityCompat.requestPermissions(
+            application.android.foregroundActivity, [android.Manifest.permission.ACCESS_FINE_LOCATION],
+            ACCESS_FINE_LOCATION_PERMISSION_REQUEST_CODE);
+
+// this is not the nicest solution as the user needs to initiate scanning again after granting permission,
+// so enhance this in a future version, but it's ok for now
+//   resolve();
+    } else {
+        resolve();
     }
   });
 };
